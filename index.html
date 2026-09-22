@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RetroVault 3D — Showcase, Publikasi & Download Aplikasi Retro</title>
+  <meta name="description" content="Platform interaktif 3D bertema retro untuk publikasi, showcase, dan unduh aplikasi mandiri. Dilengkapi CRT monitor 3D, estetika moodboard Pinterest, dan audio 8-bit." />
+  <meta name="keywords" content="retro 3d website, app showcase, three.js, synthwave, retro pc, chiptune, download apps, indiedev" />
+  
+  <!-- Retro Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Silkscreen:wght@400;700&family=Space+Grotesk:wght@300;400;500;600;700&family=VT323&display=swap" rel="stylesheet" />
+
+  <!-- CSS Stylesheets -->
+  <link rel="stylesheet" href="/src/css/retro-core.css" />
+  <link rel="stylesheet" href="/src/css/layout.css" />
+  <link rel="stylesheet" href="/src/css/components.css" />
+</head>
+<body>
+  <!-- CRT Scanlines & Vignette Overlays -->
+  <div id="crt-scanlines" class="crt-scanlines" aria-hidden="true"></div>
+  <div id="crt-vignette" class="crt-vignette" aria-hidden="true"></div>
+
+  <!-- Toast Notification Container -->
+  <div id="toast-container" class="toast-container" aria-live="polite"></div>
+
+  <div class="app-container">
+    <!-- TOP NAVIGATION BAR -->
+    <header class="retro-navbar">
+      <div class="nav-inner">
+        <a href="#" class="brand-wrapper" id="nav-brand">
+          <div class="brand-icon">RV</div>
+          <div class="brand-title">
+            <span class="glitch-text">RETROVAULT</span>
+            <span class="brand-sub">CYBER-ARCHIVE // v2.6</span>
+          </div>
+        </a>
+
+        <nav class="nav-actions" aria-label="Main Navigation">
+          <button id="btn-toggle-crt" class="control-pill-btn active" title="Toggle CRT Scanline Effect">
+            📺 CRT: ON
+          </button>
+          <button id="btn-toggle-sound" class="control-pill-btn active" title="Toggle 8-bit Sound Effects">
+            🔊 SFX: ON
+          </button>
+          <button id="btn-export-data" class="control-pill-btn" title="Export Backup JSON">
+            💾 BACKUP
+          </button>
+          <button id="btn-import-data" class="control-pill-btn" title="Import Backup JSON">
+            📂 RESTORE
+          </button>
+          <input type="file" id="import-file-input" accept=".json" style="display: none;" />
+
+          <button id="btn-open-upload" class="btn-retro btn-retro-pink">
+            + PUBLISH APP
+          </button>
+        </nav>
+      </div>
+    </header>
+
+    <main>
+      <!-- HERO SECTION WITH 3D RETRO WORKSTATION -->
+      <section class="hero-section" id="hero">
+        <div class="hero-grid">
+          <!-- Left Hero Content -->
+          <div class="hero-content">
+            <div class="hero-badge-row">
+              <span class="sticker-badge sticker-new">★ NEW 3D WORKSPACE</span>
+              <span class="sticker-badge sticker-verified">100% CLEAN ARCHIVE</span>
+              <span class="sticker-badge sticker-hot">PINTEREST AESTHETIC</span>
+            </div>
+
+            <h1 class="hero-title">
+              PUBLISH & EXPLORE <br />
+              <span class="hero-highlight glitch-text">RETRO SOFTWARE</span>
+            </h1>
+
+            <p class="hero-desc">
+              Pusat showcase dan distribusi aplikasi pribadi dengan visual interaktif 3D retro terminal. 
+              Unggah karya buatan Anda, proyeksikan ke monitor CRT 3D, dan bagikan tautan unduhan langsung ke pengguna di seluruh dunia.
+            </p>
+
+            <div class="hero-cta-group">
+              <a href="#showcase" class="btn-retro" id="hero-btn-explore">
+                ⚡ JELAJAHI APLIKASI
+              </a>
+              <button class="btn-retro btn-retro-pink" id="hero-btn-upload">
+                + UPLOAD APLIKASI BARU
+              </button>
+            </div>
+
+            <!-- Stats Ticker -->
+            <div class="stats-banner" aria-label="Platform Statistics">
+              <div class="stat-item">
+                <span class="stat-value" id="stat-total-apps">0</span>
+                <span class="stat-label">Published Apps</span>
+              </div>
+              <div class="stat-item">
+                <span class="stat-value" id="stat-total-downloads">0</span>
+                <span class="stat-label">Total Downloads</span>
+              </div>
+              <div class="stat-item">
+                <span class="stat-value" style="color: var(--neon-green);">ACTIVE</span>
+                <span class="stat-label">Network Status</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Right 3D Interactive Terminal Card -->
+          <div class="three-viewport-card" aria-label="Interactive 3D Retro Terminal">
+            <!-- HUD Overlay -->
+            <div class="three-hud-top">
+              <div class="hud-tag">
+                <span class="blink-cursor"></span>
+                <span>INTERACTIVE 3D TERMINAL</span>
+              </div>
+              <div class="hud-tag" style="border-color: var(--neon-pink); color: var(--neon-pink);">
+                <span>CRT RESOLUTION: 512x384</span>
+              </div>
+            </div>
+
+            <!-- Three.js Canvas Mount -->
+            <div id="three-canvas-container" class="three-canvas-container"></div>
+
+            <!-- Bottom Controls & Hints -->
+            <div class="three-hud-bottom">
+              <div class="three-instruction">
+                <span>🖱 Drag / Rotate • Click Monitor to Boot • Click Floppy</span>
+              </div>
+              <div class="three-actions-bar">
+                <button id="btn-floppy-eject" class="three-mini-btn" title="Eject / Insert Floppy Disk">
+                  ⏏ FLOPPY
+                </button>
+                <button id="btn-reset-camera" class="three-mini-btn" title="Reset 3D Camera View">
+                  ↺ RESET VIEW
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SHOWCASE & CATALOG SECTION -->
+      <section class="showcase-section" id="showcase">
+        <div class="section-header">
+          <div class="section-title-wrap">
+            <h2 class="section-title">
+              <span>►</span> APPLICATION ARCHIVE & REPOSITORY
+            </h2>
+            <div style="font-family: var(--font-tech); font-size: 0.8rem; color: var(--neon-cyan);">
+              // DIRECT DOWNLOADS & SPECS
+            </div>
+          </div>
+
+          <!-- Toolbar: Search & Category Filters -->
+          <div class="toolbar-container">
+            <!-- Search -->
+            <div class="search-box-wrap">
+              <span class="search-icon">🔍</span>
+              <input 
+                type="text" 
+                id="search-input" 
+                class="retro-input search-input" 
+                placeholder="Search apps by title, tags, or keyword..." 
+                autocomplete="off"
+              />
+            </div>
+
+            <!-- Category Pills -->
+            <div class="category-pills" role="tablist">
+              <button class="cat-pill active" data-category="All">ALL</button>
+              <button class="cat-pill" data-category="Games">GAMES</button>
+              <button class="cat-pill" data-category="Creative">CREATIVE</button>
+              <button class="cat-pill" data-category="Dev Tools">DEV TOOLS</button>
+              <button class="cat-pill" data-category="Audio">AUDIO</button>
+              <button class="cat-pill" data-category="Emulators">EMULATORS</button>
+            </div>
+
+            <!-- Dropdown Filters -->
+            <div class="filter-selects-wrap">
+              <select id="platform-select" class="retro-select" aria-label="Filter by Platform">
+                <option value="All">All Platforms</option>
+                <option value="Windows">Windows</option>
+                <option value="Android">Android</option>
+                <option value="macOS">macOS</option>
+                <option value="Linux">Linux</option>
+                <option value="Web">Web</option>
+              </select>
+
+              <select id="sort-select" class="retro-select" aria-label="Sort apps">
+                <option value="downloads">Most Downloaded</option>
+                <option value="newest">Newest Releases</option>
+                <option value="rating">Top Rated</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Dynamic Pinterest-Style App Cards Grid -->
+        <div id="apps-grid" class="apps-grid" aria-live="polite">
+          <!-- Cards populated dynamically via ui-manager.js -->
+        </div>
+      </section>
+    </main>
+
+    <!-- RETRO FOOTER -->
+    <footer class="retro-footer">
+      <div class="footer-inner">
+        <div class="footer-top">
+          <div style="display: flex; align-items: center; gap: 12px;">
+            <span style="font-size: 1.6rem;">💾</span>
+            <div>
+              <div style="font-family: var(--font-pixel); font-size: 0.85rem; color: #fff;">
+                RETROVAULT OS // PERSONAL SOFTWARE VAULT
+              </div>
+              <div style="font-family: var(--font-tech); font-size: 0.7rem; color: var(--neon-cyan);">
+                Crafted with Three.js, Web Audio API & Synthwave Aesthetics
+              </div>
+            </div>
+          </div>
+
+          <div style="display: flex; gap: 14px; align-items: center;">
+            <a href="#hero" class="btn-retro" style="font-size: 0.65rem; padding: 6px 12px;">
+              ▲ BACK TO TOP
+            </a>
+          </div>
+        </div>
+
+        <div class="footer-bottom">
+          <div>
+            <span>© 2026 RetroVault 3D. All rights reserved. Open access indie software distribution.</span>
+          </div>
+          <div style="font-family: var(--font-tech); color: var(--neon-green);">
+            SYSTEM INTEGRITY: 100% NOMINAL
+          </div>
+        </div>
+      </div>
+    </footer>
+  </div>
+
+  <!-- ==========================================================================
+       MODAL 1: UPLOAD & PUBLISH APPLICATION
+       ========================================================================== -->
+  <div id="upload-modal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="upload-modal-title">
+    <div class="retro-modal-window">
+      <!-- Title Bar -->
+      <div class="modal-titlebar">
+        <div class="modal-title-text" id="upload-modal-title">
+          <span>💾</span> PUBLISH_NEW_APPLICATION.EXE
+        </div>
+        <div class="window-controls">
+          <button class="win-btn" data-close-modal title="Close Window">✖</button>
+        </div>
+      </div>
+
+      <!-- Form Body -->
+      <form id="upload-form" class="modal-body">
+        <div class="form-grid-2">
+          <div class="form-group">
+            <label for="upload-title" class="form-label">Nama Aplikasi *</label>
+            <input type="text" id="upload-title" class="retro-input" placeholder="e.g. CyberStrike 3D" required />
+          </div>
+
+          <div class="form-group">
+            <label for="upload-category" class="form-label">Kategori *</label>
+            <select id="upload-category" class="retro-select" required>
+              <option value="Games">Games</option>
+              <option value="Creative">Creative</option>
+              <option value="Dev Tools">Dev Tools</option>
+              <option value="Audio">Audio & Music</option>
+              <option value="Emulators">Emulators & Utilities</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="upload-tagline" class="form-label">Tagline / Deskripsi Singkat *</label>
+          <input type="text" id="upload-tagline" class="retro-input" placeholder="e.g. Retro arcade shoot-em-up with synth soundtrack" required />
+        </div>
+
+        <div class="form-grid-2">
+          <div class="form-group">
+            <label for="upload-platform" class="form-label">Target Platform *</label>
+            <input type="text" id="upload-platform" class="retro-input" placeholder="e.g. Windows, Android, Web" required />
+          </div>
+
+          <div class="form-group">
+            <label for="upload-version" class="form-label">Versi *</label>
+            <input type="text" id="upload-version" class="retro-input" placeholder="e.g. v1.0.0" required />
+          </div>
+        </div>
+
+        <div class="form-grid-2">
+          <div class="form-group">
+            <label for="upload-size" class="form-label">Ukuran File</label>
+            <input type="text" id="upload-size" class="retro-input" placeholder="e.g. 45 MB" />
+          </div>
+
+          <div class="form-group">
+            <label for="upload-sticker" class="form-label">Retro Sticker Badge</label>
+            <select id="upload-sticker" class="retro-select">
+              <option value="NEW">NEW (Green)</option>
+              <option value="HOT">HOT (Neon Pink)</option>
+              <option value="VERIFIED">VERIFIED (Cyan)</option>
+              <option value="STAFF PICK">STAFF PICK</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Pinterest Aesthetic Image Upload / URL -->
+        <div class="form-group">
+          <label class="form-label">Gambar Thumbnail (Pinterest Image URL atau Upload File)</label>
+          <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+            <input type="url" id="upload-img-url" class="retro-input" placeholder="Paste link gambar Pinterest / Unsplash..." />
+            <label class="btn-retro" style="cursor: pointer; white-space: nowrap; font-size: 0.65rem;">
+              📁 BROWSE FILE
+              <input type="file" id="upload-img-file" accept="image/*" style="display: none;" />
+            </label>
+          </div>
+
+          <!-- Preview Box -->
+          <div class="image-preview-box">
+            <div id="upload-preview-placeholder" style="color: var(--text-muted); font-size: 0.8rem; font-family: var(--font-tech); text-align: center;">
+              🖼 PREVIEW GAMBER THUMBNAIL AKAN MUNCUL DI SINI
+            </div>
+            <img id="upload-preview-img" src="" alt="Thumbnail Preview" style="display: none;" />
+          </div>
+        </div>
+
+        <!-- Download & Demo Links -->
+        <div class="form-grid-2">
+          <div class="form-group">
+            <label for="upload-download-url" class="form-label">Link Download File (Google Drive / GitHub / URL)</label>
+            <input type="text" id="upload-download-url" class="retro-input" placeholder="https://... atau biarkan kosong untuk mock archive" />
+          </div>
+
+          <div class="form-group">
+            <label for="upload-demo-url" class="form-label">Link Demo / GitHub Repo (Opsional)</label>
+            <input type="url" id="upload-demo-url" class="retro-input" placeholder="https://github.com/..." />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="upload-desc" class="form-label">Deskripsi Lengkap *</label>
+          <textarea id="upload-desc" class="retro-input" rows="3" placeholder="Jelaskan fitur, cara bermain/menggunakan, dan keunikan aplikasi Anda..." required></textarea>
+        </div>
+
+        <div class="form-group">
+          <label for="upload-features" class="form-label">Fitur Utama (Satu baris per fitur)</label>
+          <textarea id="upload-features" class="retro-input" rows="2" placeholder="Pixel art graphics&#10;Original chiptune music&#10;Custom level editor"></textarea>
+        </div>
+
+        <div class="form-group">
+          <label for="upload-reqs" class="form-label">System Requirements</label>
+          <input type="text" id="upload-reqs" class="retro-input" placeholder="e.g. Windows 10/11, 2GB RAM" />
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn-retro btn-retro-secondary" data-close-modal>
+            BATAL
+          </button>
+          <button type="submit" class="btn-retro btn-retro-pink">
+            💾 PUBLIKASIKAN SEKARANG
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ==========================================================================
+       MODAL 2: APPLICATION DETAIL VIEW & DOWNLOAD
+       ========================================================================== -->
+  <div id="detail-modal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="detail-modal-title">
+    <div class="retro-modal-window">
+      <!-- Title Bar -->
+      <div class="modal-titlebar">
+        <div class="modal-title-text" id="detail-modal-title">
+          <span>ℹ</span> APP_INSPECTOR.EXE
+        </div>
+        <div class="window-controls">
+          <button class="win-btn" data-close-modal title="Close Window">✖</button>
+        </div>
+      </div>
+
+      <!-- Dynamic Content Body -->
+      <div id="detail-content" class="modal-body">
+        <!-- Injected via ui-manager.js -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Main JavaScript Entry -->
+  <script type="module" src="/src/js/app.js"></script>
+</body>
+</html>
