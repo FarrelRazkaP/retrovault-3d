@@ -52,8 +52,8 @@
           </button>
           <input type="file" id="import-file-input" accept=".json" style="display: none;" />
 
-          <button id="btn-admin-auth" class="control-pill-btn" title="Toggle Admin Mode">
-            🔑 ADMIN LOGIN
+          <button id="btn-admin-auth" class="control-pill-btn active" style="display: none;" title="Admin Session Active">
+            ⚡ ADMIN: LOGOUT
           </button>
 
           <button id="btn-open-upload" class="btn-retro btn-retro-pink" style="display: none;">
@@ -427,10 +427,7 @@
             autofocus 
           />
           <div id="admin-error-msg" style="color: var(--neon-pink); font-family: var(--font-tech); font-size: 0.75rem; text-align: center; margin-top: 6px; min-height: 18px;"></div>
-        </div>
-
-        <div style="background: rgba(255,255,255,0.03); border: 1px dashed var(--border-color); padding: 10px; font-size: 0.75rem; color: var(--text-muted); font-family: var(--font-tech); text-align: center;">
-          Default PIN: <code style="color: var(--neon-green);">farrel2026</code> (Bisa diubah di file .env / Vercel Settings)
+          <div id="admin-lockout-timer" style="display: none; background: rgba(255, 42, 133, 0.2); border: 1px solid var(--neon-pink); padding: 8px; color: var(--neon-pink); font-family: var(--font-pixel); font-size: 0.72rem; text-align: center; margin-top: 8px;"></div>
         </div>
 
         <div class="modal-footer" style="justify-content: space-between;">

@@ -1,7 +1,10 @@
 /**
- * RetroVault - UI Manager & Application Lifecycle
- * Orchestrates DOM events, Pinterest-style cards rendering, admin authentication,
- * upload modals, screenshot carousel, filtering/search, and retro sound effects.
+ * RetroVault - Hardened UI Manager & Application Lifecycle
+ * Features:
+ * - Stealth Admin Mode (no admin buttons visible to regular public visitors)
+ * - Anti-Brute-Force Lockout Countdown Timer & Alarm
+ * - Secret Trigger Mechanisms (Ctrl+Shift+F, Triple-Click Logo, ?admin=farrel URL)
+ * - Pinterest Moodboard Carousel & Direct Share Link
  */
 
 import { storage } from './storage.js';
@@ -28,6 +31,7 @@ export class UIManager {
     this.statTotalApps = document.getElementById('stat-total-apps');
     this.statTotalDownloads = document.getElementById('stat-total-downloads');
     this.toastContainer = document.getElementById('toast-container');
+    this.brandIcon = document.querySelector('.brand-icon');
 
     // Controls
     this.searchInput = document.getElementById('search-input');
@@ -35,7 +39,7 @@ export class UIManager {
     this.platformSelect = document.getElementById('platform-select');
     this.sortSelect = document.getElementById('sort-select');
 
-    // Toggles & Auth
+    // Toggles & Stealth Auth
     this.btnAdminAuth = document.getElementById('btn-admin-auth');
     this.btnToggleSound = document.getElementById('btn-toggle-sound');
     this.btnToggleCrt = document.getElementById('btn-toggle-crt');
@@ -49,6 +53,8 @@ export class UIManager {
     this.adminLoginForm = document.getElementById('admin-login-form');
     this.adminPinInput = document.getElementById('admin-pin-input');
     this.adminErrorMsg = document.getElementById('admin-error-msg');
+    this.adminLockoutTimer = document.getElementById('admin-lockout-timer');
+    this.adminSubmitBtn = this.adminLoginForm ? this.adminLoginForm.querySelector('button[type="submit"]') : null;
 
     this.btnOpenUpload = document.getElementById('btn-open-upload');
     this.heroBtnUpload = document.getElementById('hero-btn-upload');
@@ -70,6 +76,7 @@ export class UIManager {
     auth.onAuthChange((isAdmin) => {
       if (isAdmin) {
         if (this.btnAdminAuth) {
+          this.btnAdminAuth.style.display = 'inline-flex';
           this.btnAdminAuth.innerHTML = '⚡ ADMIN: LOGOUT';
           this.btnAdminAuth.classList.add('active');
         }
@@ -77,8 +84,9 @@ export class UIManager {
           this.btnOpenUpload.style.display = 'inline-flex';
         }
       } else {
+        // GHOST MODE: Completely hide admin button for public visitors
         if (this.btnAdminAuth) {
-          this.btnAdminAuth.innerHTML = '🔑 ADMIN LOGIN';
+          this.btnAdminAuth.style.display = 'none';
           this.btnAdminAuth.classList.remove('active');
         }
         if (this.btnOpenUpload) {
@@ -97,40 +105,66 @@ export class UIManager {
         if (auth.isAdmin()) {
           auth.logout();
           this.showToast('LOGGED OUT FROM ADMIN MODE');
-        } else {
-          this.openAdminModal();
         }
       });
     }
 
     if (this.adminLoginForm) {
-      this.adminLoginForm.addEventListener('submit', (e) => {
+      this.adminLoginForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         const pin = this.adminPinInput.value;
-        const result = auth.login(pin);
+        this.adminErrorMsg.textContent = 'CHECKING CRYPTOGRAPHIC HASH...';
+
+        const result = await auth.verifyPin(pin);
         if (result.success) {
           sound.playPowerUp();
           this.adminModal.classList.remove('active');
           this.adminPinInput.value = '';
           this.adminErrorMsg.textContent = '';
-          this.showToast('ADMIN CLEARANCE GRANTED // ACCESS UNLOCKED');
+          if (this.adminLockoutTimer) this.adminLockoutTimer.style.display = 'none';
+          this.showToast('ACCESS GRANTED // WELCOME FARREL');
         } else {
-          sound.playBeep(220);
-          this.adminErrorMsg.textContent = '✖ ' + result.error;
-          this.adminPinInput.value = '';
-          this.adminPinInput.focus();
+          if (result.locked) {
+            sound.playSecurityAlarm();
+            this.handleLockout(result.error);
+          } else {
+            sound.playBeep(220);
+            this.adminErrorMsg.textContent = '✖ ' + result.error;
+            this.adminPinInput.value = '';
+            this.adminPinInput.focus();
+          }
         }
       });
     }
 
-    // Secret shortcut: Ctrl + Shift + A to open Admin Login
+    // STEALTH TRIGGER 1: Secret keyboard shortcuts (Ctrl+Shift+F or Ctrl+Shift+Alt+A)
     window.addEventListener('keydown', (e) => {
-      if (e.ctrlKey && e.shiftKey && (e.key === 'A' || e.key === 'a')) {
+      const isFarrelCombo = e.ctrlKey && e.shiftKey && (e.key === 'F' || e.key === 'f');
+      const isAltCombo = e.ctrlKey && e.shiftKey && e.altKey && (e.key === 'A' || e.key === 'a');
+      if (isFarrelCombo || isAltCombo) {
         e.preventDefault();
-        sound.playBeep(1200);
+        sound.playBeep(1400);
         this.openAdminModal();
       }
     });
+
+    // STEALTH TRIGGER 2: Triple-click on logo icon
+    let brandClicks = 0;
+    let brandClickTimer = null;
+    if (this.brandIcon) {
+      this.brandIcon.addEventListener('click', (e) => {
+        brandClicks++;
+        clearTimeout(brandClickTimer);
+        if (brandClicks >= 3) {
+          e.preventDefault();
+          sound.playBeep(1400);
+          brandClicks = 0;
+          this.openAdminModal();
+        } else {
+          brandClickTimer = setTimeout(() => { brandClicks = 0; }, 600);
+        }
+      });
+    }
 
     // 2. Search & Filtering
     if (this.searchInput) {
@@ -194,7 +228,7 @@ export class UIManager {
       sound.playClick();
       if (!auth.isAdmin()) {
         this.openAdminModal();
-        this.showToast('HARAP LOGIN SEBAGAI ADMIN UNTUK UPLOAD', 'danger');
+        this.showToast('AKSES DITOLAK: LOGIN SEBAGAI ADMIN UNTUK UPLOAD', 'danger');
         return;
       }
       this.uploadModal.classList.add('active');
@@ -300,12 +334,51 @@ export class UIManager {
     }
   }
 
+  handleLockout(msg) {
+    if (this.adminErrorMsg) this.adminErrorMsg.textContent = '✖ ' + msg;
+    if (this.adminPinInput) this.adminPinInput.disabled = true;
+    if (this.adminSubmitBtn) this.adminSubmitBtn.disabled = true;
+    if (this.adminLockoutTimer) this.adminLockoutTimer.style.display = 'block';
+
+    const timerInterval = setInterval(() => {
+      const lock = auth.isLockedOut();
+      if (lock.locked) {
+        const mins = Math.floor(lock.remainingSeconds / 60);
+        const secs = lock.remainingSeconds % 60;
+        if (this.adminLockoutTimer) {
+          this.adminLockoutTimer.textContent = `[TERMINAL LOCKED: ${mins}:${secs < 10 ? '0' : ''}${secs}]`;
+        }
+      } else {
+        clearInterval(timerInterval);
+        if (this.adminPinInput) this.adminPinInput.disabled = false;
+        if (this.adminSubmitBtn) this.adminSubmitBtn.disabled = false;
+        if (this.adminLockoutTimer) this.adminLockoutTimer.style.display = 'none';
+        if (this.adminErrorMsg) this.adminErrorMsg.textContent = 'Lockout berakhir. Silakan coba kembali.';
+        if (this.adminPinInput) this.adminPinInput.focus();
+      }
+    }, 1000);
+  }
+
   openAdminModal() {
     if (!this.adminModal) return;
     this.adminErrorMsg.textContent = '';
     this.adminPinInput.value = '';
+
+    const lockStatus = auth.isLockedOut();
+    if (lockStatus.locked) {
+      this.handleLockout(`Terminal terkunci selama ${lockStatus.remainingSeconds} detik.`);
+    } else {
+      if (this.adminPinInput) this.adminPinInput.disabled = false;
+      if (this.adminSubmitBtn) this.adminSubmitBtn.disabled = false;
+      if (this.adminLockoutTimer) this.adminLockoutTimer.style.display = 'none';
+    }
+
     this.adminModal.classList.add('active');
-    setTimeout(() => this.adminPinInput.focus(), 150);
+    setTimeout(() => {
+      if (!auth.isLockedOut().locked && this.adminPinInput) {
+        this.adminPinInput.focus();
+      }
+    }, 150);
   }
 
   handleUploadSubmit() {
@@ -327,7 +400,6 @@ export class UIManager {
     const featuresRaw = document.getElementById('upload-features').value.trim();
     const requirements = document.getElementById('upload-reqs').value.trim() || 'Windows / Cross-platform';
 
-    // Image determination
     let thumbnailUrl = this.previewImg.src;
     if (!thumbnailUrl || this.previewImg.style.display === 'none') {
       thumbnailUrl = 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?q=80&w=800&auto=format&fit=crop';
@@ -366,7 +438,6 @@ export class UIManager {
     this.previewPlaceholder.style.display = 'flex';
     this.uploadModal.classList.remove('active');
 
-    // Update 3D scene to highlight newly uploaded app
     if (this.retroScene) {
       this.retroScene.setActiveApp(newApp);
     }
@@ -378,6 +449,12 @@ export class UIManager {
   }
 
   checkDeepLink() {
+    // Check stealth query parameter (?admin=farrel or ?vault=unlock)
+    const searchParams = new URLSearchParams(window.location.search);
+    if (searchParams.has('admin') || searchParams.has('vault')) {
+      setTimeout(() => this.openAdminModal(), 600);
+    }
+
     const hash = window.location.hash.replace('#', '');
     if (hash && hash !== 'hero' && hash !== 'showcase') {
       const app = storage.getAppById(hash);
@@ -393,14 +470,12 @@ export class UIManager {
   render() {
     const allApps = storage.getAllApps();
 
-    // Update Header Stats
     let totalDownloads = 0;
     allApps.forEach((a) => (totalDownloads += a.downloadsCount || 0));
 
     if (this.statTotalApps) this.statTotalApps.textContent = allApps.length;
     if (this.statTotalDownloads) this.statTotalDownloads.textContent = totalDownloads.toLocaleString();
 
-    // Filter by Category & Search
     let filtered = allApps.filter((app) => {
       const matchCat = this.currentCategory === 'All' || app.category.toLowerCase() === this.currentCategory.toLowerCase();
       const matchPlatform = this.currentPlatform === 'All' || app.platform.toLowerCase().includes(this.currentPlatform.toLowerCase());
@@ -413,7 +488,6 @@ export class UIManager {
       return matchCat && matchPlatform && matchSearch;
     });
 
-    // Sort
     if (this.currentSort === 'downloads') {
       filtered.sort((a, b) => (b.downloadsCount || 0) - (a.downloadsCount || 0));
     } else if (this.currentSort === 'newest') {
@@ -424,7 +498,6 @@ export class UIManager {
 
     this.renderCards(filtered);
 
-    // Set initial 3D app if none selected
     if (this.retroScene && !this.retroScene.activeApp && allApps.length > 0) {
       this.retroScene.setActiveApp(allApps[0]);
     }
@@ -460,7 +533,7 @@ export class UIManager {
         const adminControls = isAdmin
           ? `
             <div class="admin-card-actions">
-              <span class="admin-badge">⚡ ADMIN</span>
+              <span class="admin-badge">⚡ ADMIN CONTROL</span>
               <button class="btn-retro btn-retro-secondary danger" data-action="delete" data-id="${app.id}" style="font-size: 0.62rem; padding: 4px 8px;">
                 🗑 HAPUS
               </button>
@@ -593,13 +666,11 @@ export class UIManager {
     const container = document.getElementById('detail-content');
     if (!container) return;
 
-    // Build Pinterest screenshot carousel items
     const screenshots = app.screenshots && app.screenshots.length > 0 
       ? app.screenshots 
       : [app.thumbnailUrl];
 
     let currentSlideIdx = 0;
-
     const shareUrl = window.location.origin + window.location.pathname + '#' + app.id;
 
     container.innerHTML = `
@@ -697,7 +768,6 @@ export class UIManager {
       </div>
     `;
 
-    // Hook Carousel Navigation
     if (screenshots.length > 1) {
       const carouselImg = document.getElementById('carousel-img');
       const thumbs = container.querySelectorAll('.carousel-thumb');
@@ -719,7 +789,6 @@ export class UIManager {
       });
     }
 
-    // Hook Share Link Button
     document.getElementById('modal-share-btn').addEventListener('click', () => {
       sound.playBeep(1100);
       navigator.clipboard.writeText(shareUrl).then(() => {
@@ -729,12 +798,10 @@ export class UIManager {
       });
     });
 
-    // Hook Download Button
     document.getElementById('modal-download-btn').addEventListener('click', () => {
       this.handleDownload(app);
     });
 
-    // Hook 3D Projection Button
     document.getElementById('modal-preview-3d-btn').addEventListener('click', () => {
       sound.playClick();
       if (this.retroScene) {

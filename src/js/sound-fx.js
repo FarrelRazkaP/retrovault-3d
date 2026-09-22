@@ -234,6 +234,37 @@ class SoundFX {
       console.warn('Audio FX error:', e);
     }
   }
+
+  // 7. Security alert / Access Denied buzzer
+  playSecurityAlarm() {
+    if (this.muted) return;
+    this.ensureContext();
+    if (!this.ctx) return;
+
+    try {
+      const now = this.ctx.currentTime;
+      for (let i = 0; i < 2; i++) {
+        const stepTime = now + (i * 0.15);
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(140, stepTime);
+        osc.frequency.setValueAtTime(110, stepTime + 0.06);
+
+        gain.gain.setValueAtTime(0.2, stepTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, stepTime + 0.12);
+
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+
+        osc.start(stepTime);
+        osc.stop(stepTime + 0.12);
+      }
+    } catch (e) {
+      console.warn('Audio FX error:', e);
+    }
+  }
 }
 
 export const sound = new SoundFX();
