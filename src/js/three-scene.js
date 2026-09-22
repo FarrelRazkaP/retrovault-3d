@@ -401,14 +401,14 @@ export class RetroScene {
     ctx.font = '14px Courier, monospace';
     ctx.fillText('ONLINE [60 FPS]', w - 165, 39);
 
-    // App Information
-    const title = this.activeApp ? this.activeApp.title : 'CYBERRUNNER 2084';
-    const version = this.activeApp ? this.activeApp.version : 'v1.4.2';
-    const category = this.activeApp ? this.activeApp.category : 'GAMES';
-    const platform = this.activeApp ? this.activeApp.platform : 'WIN / LINUX / WEB';
+    // App Information or Standby Screen
+    const title = this.activeApp ? this.activeApp.title : 'VAULT STANDBY';
+    const version = this.activeApp ? this.activeApp.version : 'v1.0.0';
+    const category = this.activeApp ? this.activeApp.category : 'SYSTEM';
+    const platform = this.activeApp ? this.activeApp.platform : 'READY FOR YOUR APPS';
 
     // Main App Title Banner
-    ctx.fillStyle = '#ff2a85';
+    ctx.fillStyle = this.activeApp ? '#ff2a85' : '#00ff66';
     ctx.font = 'bold 26px Courier, monospace';
     ctx.fillText('► ' + title.toUpperCase(), 28, 95);
 
@@ -446,7 +446,10 @@ export class RetroScene {
     // Bottom Action Prompt
     ctx.fillStyle = '#00ff66';
     ctx.font = 'bold 15px Courier, monospace';
-    ctx.fillText('► CLICK SCREEN TO INSPECT APP / DOWNLOAD', 28, 325);
+    const bottomPrompt = this.activeApp 
+      ? '► CLICK SCREEN TO INSPECT APP / DOWNLOAD' 
+      : '► REPOSITORY READY // UPLOAD TO PROJECT HERE';
+    ctx.fillText(bottomPrompt, 28, 325);
 
     ctx.fillStyle = 'rgba(0, 255, 102, 0.6)';
     ctx.font = '12px Courier, monospace';

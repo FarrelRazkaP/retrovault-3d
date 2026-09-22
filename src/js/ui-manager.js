@@ -506,18 +506,51 @@ export class UIManager {
   renderCards(apps) {
     if (!this.appsGrid) return;
 
+    const allApps = storage.getAllApps();
+    const isAdmin = auth.isAdmin();
+
+    if (allApps.length === 0) {
+      this.appsGrid.innerHTML = `
+        <div style="grid-column: 1 / -1; text-align: center; padding: 70px 24px; background: radial-gradient(circle at center, rgba(31, 27, 71, 0.5) 0%, rgba(9, 8, 24, 0.8) 100%); border: 2px dashed var(--neon-cyan); border-radius: var(--radius-md); box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
+          <div style="font-size: 3.2rem; margin-bottom: 14px; filter: drop-shadow(0 0 10px var(--neon-cyan));">💾</div>
+          <h3 style="font-family: var(--font-pixel); font-size: 1.15rem; color: #fff; margin-bottom: 10px;">
+            ARSIP BERSIH // SIAP UNTUK UPLOAD APLIKASI
+          </h3>
+          <p style="color: var(--text-dim); max-width: 520px; margin: 0 auto 20px; line-height: 1.6; font-size: 0.95rem;">
+            Seluruh data contoh telah dibersihkan. Repository kini dalam status standby dan siap mempublikasikan aplikasi asli buatan Anda.
+          </p>
+          ${isAdmin ? `
+            <button class="btn-retro btn-retro-pink" data-action="quick-upload" style="font-size: 0.78rem; padding: 12px 24px;">
+              + UPLOAD APLIKASI PERTAMA ANDA
+            </button>
+          ` : `
+            <div style="display: inline-flex; align-items: center; gap: 8px; font-family: var(--font-tech); font-size: 0.78rem; color: var(--neon-green); background: rgba(0, 255, 102, 0.1); border: 1px solid rgba(0, 255, 102, 0.3); padding: 8px 16px; border-radius: var(--radius-sm);">
+              <span class="blink-cursor"></span> Menunggu peluncuran aplikasi retro perdana...
+            </div>
+          `}
+        </div>
+      `;
+
+      const quickUploadBtn = this.appsGrid.querySelector('[data-action="quick-upload"]');
+      if (quickUploadBtn) {
+        quickUploadBtn.addEventListener('click', () => {
+          sound.playClick();
+          if (this.uploadModal) this.uploadModal.classList.add('active');
+        });
+      }
+      return;
+    }
+
     if (apps.length === 0) {
       this.appsGrid.innerHTML = `
         <div style="grid-column: 1 / -1; text-align: center; padding: 60px 20px; background: rgba(21, 19, 54, 0.4); border: 2px dashed var(--border-color); border-radius: var(--radius-md);">
           <div style="font-family: var(--font-pixel); font-size: 1.1rem; color: var(--neon-pink); margin-bottom: 12px;">NO APPS FOUND // 404</div>
-          <p style="color: var(--text-muted); font-size: 0.95rem;">No retro software matches your current search filters.</p>
-          <button class="btn-retro" style="margin-top: 20px;" onclick="window.location.reload()">RESET FILTERS</button>
+          <p style="color: var(--text-muted); font-size: 0.95rem;">Tidak ada aplikasi yang cocok dengan filter pencarian Anda.</p>
+          <button class="btn-retro" style="margin-top: 20px;" onclick="window.location.reload()">RESET FILTER</button>
         </div>
       `;
       return;
     }
-
-    const isAdmin = auth.isAdmin();
 
     this.appsGrid.innerHTML = apps
       .map((app) => {
