@@ -1,11 +1,12 @@
 /**
  * RetroVault - UI Manager & Application Lifecycle
- * Orchestrates DOM events, Pinterest-style cards rendering, upload modals,
- * filtering/search, and retro sound effects integration.
+ * Orchestrates DOM events, Pinterest-style cards rendering, admin authentication,
+ * upload modals, screenshot carousel, filtering/search, and retro sound effects.
  */
 
 import { storage } from './storage.js';
 import { sound } from './sound-fx.js';
+import { auth } from './auth.js';
 
 export class UIManager {
   constructor(retroScene) {
@@ -16,7 +17,9 @@ export class UIManager {
     this.currentSort = 'downloads';
     this.initElements();
     this.attachEvents();
+    this.initAuthState();
     this.render();
+    this.checkDeepLink();
   }
 
   initElements() {
@@ -32,7 +35,8 @@ export class UIManager {
     this.platformSelect = document.getElementById('platform-select');
     this.sortSelect = document.getElementById('sort-select');
 
-    // Toggles
+    // Toggles & Auth
+    this.btnAdminAuth = document.getElementById('btn-admin-auth');
     this.btnToggleSound = document.getElementById('btn-toggle-sound');
     this.btnToggleCrt = document.getElementById('btn-toggle-crt');
     this.crtScanlines = document.getElementById('crt-scanlines');
@@ -41,6 +45,11 @@ export class UIManager {
     // Modals
     this.uploadModal = document.getElementById('upload-modal');
     this.detailModal = document.getElementById('detail-modal');
+    this.adminModal = document.getElementById('admin-login-modal');
+    this.adminLoginForm = document.getElementById('admin-login-form');
+    this.adminPinInput = document.getElementById('admin-pin-input');
+    this.adminErrorMsg = document.getElementById('admin-error-msg');
+
     this.btnOpenUpload = document.getElementById('btn-open-upload');
     this.heroBtnUpload = document.getElementById('hero-btn-upload');
     this.uploadForm = document.getElementById('upload-form');
@@ -57,8 +66,73 @@ export class UIManager {
     this.importFileInput = document.getElementById('import-file-input');
   }
 
+  initAuthState() {
+    auth.onAuthChange((isAdmin) => {
+      if (isAdmin) {
+        if (this.btnAdminAuth) {
+          this.btnAdminAuth.innerHTML = '⚡ ADMIN: LOGOUT';
+          this.btnAdminAuth.classList.add('active');
+        }
+        if (this.btnOpenUpload) {
+          this.btnOpenUpload.style.display = 'inline-flex';
+        }
+      } else {
+        if (this.btnAdminAuth) {
+          this.btnAdminAuth.innerHTML = '🔑 ADMIN LOGIN';
+          this.btnAdminAuth.classList.remove('active');
+        }
+        if (this.btnOpenUpload) {
+          this.btnOpenUpload.style.display = 'none';
+        }
+      }
+      this.render();
+    });
+  }
+
   attachEvents() {
-    // 1. Search & Filtering
+    // 1. Admin Authentication Handlers
+    if (this.btnAdminAuth) {
+      this.btnAdminAuth.addEventListener('click', () => {
+        sound.playClick();
+        if (auth.isAdmin()) {
+          auth.logout();
+          this.showToast('LOGGED OUT FROM ADMIN MODE');
+        } else {
+          this.openAdminModal();
+        }
+      });
+    }
+
+    if (this.adminLoginForm) {
+      this.adminLoginForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const pin = this.adminPinInput.value;
+        const result = auth.login(pin);
+        if (result.success) {
+          sound.playPowerUp();
+          this.adminModal.classList.remove('active');
+          this.adminPinInput.value = '';
+          this.adminErrorMsg.textContent = '';
+          this.showToast('ADMIN CLEARANCE GRANTED // ACCESS UNLOCKED');
+        } else {
+          sound.playBeep(220);
+          this.adminErrorMsg.textContent = '✖ ' + result.error;
+          this.adminPinInput.value = '';
+          this.adminPinInput.focus();
+        }
+      });
+    }
+
+    // Secret shortcut: Ctrl + Shift + A to open Admin Login
+    window.addEventListener('keydown', (e) => {
+      if (e.ctrlKey && e.shiftKey && (e.key === 'A' || e.key === 'a')) {
+        e.preventDefault();
+        sound.playBeep(1200);
+        this.openAdminModal();
+      }
+    });
+
+    // 2. Search & Filtering
     if (this.searchInput) {
       this.searchInput.addEventListener('input', (e) => {
         this.currentSearch = e.target.value.toLowerCase();
@@ -94,7 +168,7 @@ export class UIManager {
       });
     }
 
-    // 2. Toggles
+    // 3. Audio & CRT Toggles
     if (this.btnToggleSound) {
       this.btnToggleSound.addEventListener('click', () => {
         const isMuted = sound.toggleMute();
@@ -115,9 +189,14 @@ export class UIManager {
       });
     }
 
-    // 3. Upload Modal Open/Close
+    // 4. Upload Modal Open/Close (Protected by Admin Auth)
     const openUpload = () => {
       sound.playClick();
+      if (!auth.isAdmin()) {
+        this.openAdminModal();
+        this.showToast('HARAP LOGIN SEBAGAI ADMIN UNTUK UPLOAD', 'danger');
+        return;
+      }
       this.uploadModal.classList.add('active');
     };
 
@@ -129,11 +208,12 @@ export class UIManager {
         sound.playClick();
         this.uploadModal.classList.remove('active');
         this.detailModal.classList.remove('active');
+        if (this.adminModal) this.adminModal.classList.remove('active');
       });
     });
 
     // Close on backdrop click
-    [this.uploadModal, this.detailModal].forEach((modal) => {
+    [this.uploadModal, this.detailModal, this.adminModal].forEach((modal) => {
       if (modal) {
         modal.addEventListener('click', (e) => {
           if (e.target === modal) {
@@ -144,7 +224,7 @@ export class UIManager {
       }
     });
 
-    // 4. Image live preview in Upload Modal
+    // 5. Image live preview in Upload Modal
     if (this.inputImgUrl) {
       this.inputImgUrl.addEventListener('input', (e) => {
         const url = e.target.value.trim();
@@ -165,14 +245,14 @@ export class UIManager {
             this.previewImg.src = event.target.result;
             this.previewImg.style.display = 'block';
             this.previewPlaceholder.style.display = 'none';
-            this.inputImgUrl.value = ''; // clear url input if local file is uploaded
+            this.inputImgUrl.value = '';
           };
           reader.readAsDataURL(file);
         }
       });
     }
 
-    // 5. Upload Form Submit
+    // 6. Upload Form Submit
     if (this.uploadForm) {
       this.uploadForm.addEventListener('submit', (e) => {
         e.preventDefault();
@@ -180,7 +260,7 @@ export class UIManager {
       });
     }
 
-    // 6. Data Export / Import
+    // 7. Data Export / Import
     if (this.btnExportData) {
       this.btnExportData.addEventListener('click', () => {
         sound.playBeep(1200);
@@ -191,6 +271,11 @@ export class UIManager {
 
     if (this.btnImportData && this.importFileInput) {
       this.btnImportData.addEventListener('click', () => {
+        if (!auth.isAdmin()) {
+          this.openAdminModal();
+          this.showToast('LOGIN ADMIN DIPERLUKAN UNTUK RESTORE DATA', 'danger');
+          return;
+        }
         this.importFileInput.click();
       });
 
@@ -215,7 +300,20 @@ export class UIManager {
     }
   }
 
+  openAdminModal() {
+    if (!this.adminModal) return;
+    this.adminErrorMsg.textContent = '';
+    this.adminPinInput.value = '';
+    this.adminModal.classList.add('active');
+    setTimeout(() => this.adminPinInput.focus(), 150);
+  }
+
   handleUploadSubmit() {
+    if (!auth.isAdmin()) {
+      this.showToast('UNAUTHORIZED: ADMIN ACCESS REQUIRED', 'danger');
+      return;
+    }
+
     const title = document.getElementById('upload-title').value.trim();
     const tagline = document.getElementById('upload-tagline').value.trim();
     const category = document.getElementById('upload-category').value;
@@ -254,6 +352,7 @@ export class UIManager {
       features,
       requirements,
       thumbnailUrl,
+      screenshots: [thumbnailUrl],
       downloadsCount: 0,
       rating: 5.0,
       releaseDate: new Date().toISOString().split('T')[0]
@@ -275,8 +374,20 @@ export class UIManager {
     this.showToast(`APP "${title.toUpperCase()}" PUBLISHED!`);
     this.render();
 
-    // Scroll to the newly added app
-    window.location.hash = '#showcase';
+    window.location.hash = '#' + newApp.id;
+  }
+
+  checkDeepLink() {
+    const hash = window.location.hash.replace('#', '');
+    if (hash && hash !== 'hero' && hash !== 'showcase') {
+      const app = storage.getAppById(hash);
+      if (app) {
+        setTimeout(() => {
+          if (this.retroScene) this.retroScene.setActiveApp(app);
+          this.openDetailModal(app);
+        }, 500);
+      }
+    }
   }
 
   render() {
@@ -289,7 +400,7 @@ export class UIManager {
     if (this.statTotalApps) this.statTotalApps.textContent = allApps.length;
     if (this.statTotalDownloads) this.statTotalDownloads.textContent = totalDownloads.toLocaleString();
 
-    // Filter by Category
+    // Filter by Category & Search
     let filtered = allApps.filter((app) => {
       const matchCat = this.currentCategory === 'All' || app.category.toLowerCase() === this.currentCategory.toLowerCase();
       const matchPlatform = this.currentPlatform === 'All' || app.platform.toLowerCase().includes(this.currentPlatform.toLowerCase());
@@ -311,10 +422,9 @@ export class UIManager {
       filtered.sort((a, b) => (b.rating || 0) - (a.rating || 0));
     }
 
-    // Render cards into DOM
     this.renderCards(filtered);
 
-    // Initial 3D scene active app if not set
+    // Set initial 3D app if none selected
     if (this.retroScene && !this.retroScene.activeApp && allApps.length > 0) {
       this.retroScene.setActiveApp(allApps[0]);
     }
@@ -334,6 +444,8 @@ export class UIManager {
       return;
     }
 
+    const isAdmin = auth.isAdmin();
+
     this.appsGrid.innerHTML = apps
       .map((app) => {
         const stickerClass =
@@ -344,6 +456,17 @@ export class UIManager {
             : app.sticker === 'VERIFIED'
             ? 'sticker-verified'
             : 'sticker-new';
+
+        const adminControls = isAdmin
+          ? `
+            <div class="admin-card-actions">
+              <span class="admin-badge">⚡ ADMIN</span>
+              <button class="btn-retro btn-retro-secondary danger" data-action="delete" data-id="${app.id}" style="font-size: 0.62rem; padding: 4px 8px;">
+                🗑 HAPUS
+              </button>
+            </div>
+          `
+          : '';
 
         return `
         <div class="app-card" data-id="${app.id}">
@@ -391,6 +514,8 @@ export class UIManager {
                 ℹ
               </button>
             </div>
+
+            ${adminControls}
           </div>
         </div>
       `;
@@ -412,7 +537,6 @@ export class UIManager {
           if (this.retroScene) {
             this.retroScene.setActiveApp(app);
           }
-          // Scroll up smoothly to 3D hero
           document.querySelector('.hero-section').scrollIntoView({ behavior: 'smooth' });
           this.showToast(`PROJECTED "${app.title.toUpperCase()}" TO CRT MONITOR!`);
         } else if (action === 'open-detail') {
@@ -420,6 +544,13 @@ export class UIManager {
           this.openDetailModal(app);
         } else if (action === 'download') {
           this.handleDownload(app);
+        } else if (action === 'delete') {
+          if (confirm(`Hapus aplikasi "${app.title}" dari arsip?`)) {
+            sound.playBeep(300);
+            storage.deleteApp(app.id);
+            this.showToast(`APLIKASI "${app.title.toUpperCase()}" DIHAPUS`);
+            this.render();
+          }
         }
       });
     });
@@ -427,9 +558,8 @@ export class UIManager {
 
   handleDownload(app) {
     sound.playDownload();
-    const newCount = storage.incrementDownloads(app.id);
+    storage.incrementDownloads(app.id);
 
-    // Provide a simulated direct download file if link is a placeholder
     if (!app.downloadUrl || app.downloadUrl.startsWith('#')) {
       const dummyContent = `=====================================================\r\n` +
         `RETROVAULT APPLICATION ARCHIVE\r\n` +
@@ -463,6 +593,15 @@ export class UIManager {
     const container = document.getElementById('detail-content');
     if (!container) return;
 
+    // Build Pinterest screenshot carousel items
+    const screenshots = app.screenshots && app.screenshots.length > 0 
+      ? app.screenshots 
+      : [app.thumbnailUrl];
+
+    let currentSlideIdx = 0;
+
+    const shareUrl = window.location.origin + window.location.pathname + '#' + app.id;
+
     container.innerHTML = `
       <div class="detail-header-wrap">
         <img class="detail-thumb" src="${app.thumbnailUrl}" alt="${app.title}" />
@@ -475,6 +614,27 @@ export class UIManager {
           <h2 style="font-family: var(--font-pixel); font-size: 1.3rem; color: #fff; margin-top: 6px;">${app.title}</h2>
           <p style="color: var(--neon-cyan); font-size: 0.95rem;">${app.tagline || ''}</p>
         </div>
+      </div>
+
+      <!-- Pinterest-style Screenshot Carousel -->
+      <div>
+        <h4 style="font-family: var(--font-tech); color: var(--neon-cyan); margin-bottom: 8px; font-size: 0.8rem; text-transform: uppercase;">
+          🖼 SCREENSHOT GALLERY // PINTEREST MOODBOARD
+        </h4>
+        <div class="carousel-container">
+          <img id="carousel-img" class="carousel-main-img" src="${screenshots[0]}" alt="${app.title} Screenshot" />
+          ${screenshots.length > 1 ? `
+            <button id="carousel-prev" class="carousel-nav-btn carousel-nav-prev">◀</button>
+            <button id="carousel-next" class="carousel-nav-btn carousel-nav-next">▶</button>
+          ` : ''}
+        </div>
+        ${screenshots.length > 1 ? `
+          <div class="carousel-thumbs-row">
+            ${screenshots.map((s, idx) => `
+              <img class="carousel-thumb ${idx === 0 ? 'active' : ''}" data-idx="${idx}" src="${s}" alt="Thumb ${idx + 1}" />
+            `).join('')}
+          </div>
+        ` : ''}
       </div>
 
       <div class="detail-specs-box">
@@ -506,7 +666,7 @@ export class UIManager {
       </div>
 
       <div>
-        <h4 style="font-family: var(--font-tech); color: var(--neon-cyan); margin-bottom: 8px; font-size: 0.82rem; text-transform: uppercase;">
+        <h4 style="font-family: var(--font-tech); color: var(--neon-green); margin-bottom: 8px; font-size: 0.82rem; text-transform: uppercase;">
           KEY FEATURES
         </h4>
         <ul class="feature-list">
@@ -525,20 +685,56 @@ export class UIManager {
         <button id="modal-download-btn" class="btn-retro btn-retro-pink" style="font-size: 0.85rem; padding: 14px 28px;">
           ⬇ INSTANT DOWNLOAD (${app.size})
         </button>
-        <div style="display: flex; gap: 14px; font-size: 0.75rem; color: var(--text-muted); font-family: var(--font-tech);">
+        <div style="display: flex; gap: 14px; align-items: center; flex-wrap: wrap; font-size: 0.75rem; color: var(--text-muted); font-family: var(--font-tech);">
           ${app.demoUrl ? `<a href="${app.demoUrl}" target="_blank" style="color: var(--neon-cyan); text-decoration: none;">▶ WEB DEMO / REPO</a>` : ''}
           <button id="modal-preview-3d-btn" style="background: none; border: none; color: var(--neon-green); cursor: pointer; font-family: var(--font-tech);">
-            📺 PREVIEW IN 3D MONITOR
+            📺 PREVIEW IN 3D
+          </button>
+          <button id="modal-share-btn" style="background: none; border: none; color: var(--neon-pink); cursor: pointer; font-family: var(--font-tech);">
+            🔗 COPY SHARE LINK
           </button>
         </div>
       </div>
     `;
 
-    // Hook buttons inside detail modal
+    // Hook Carousel Navigation
+    if (screenshots.length > 1) {
+      const carouselImg = document.getElementById('carousel-img');
+      const thumbs = container.querySelectorAll('.carousel-thumb');
+
+      const setSlide = (idx) => {
+        sound.playClick();
+        currentSlideIdx = (idx + screenshots.length) % screenshots.length;
+        carouselImg.src = screenshots[currentSlideIdx];
+        thumbs.forEach((t, i) => t.classList.toggle('active', i === currentSlideIdx));
+      };
+
+      const btnPrev = document.getElementById('carousel-prev');
+      const btnNext = document.getElementById('carousel-next');
+      if (btnPrev) btnPrev.addEventListener('click', () => setSlide(currentSlideIdx - 1));
+      if (btnNext) btnNext.addEventListener('click', () => setSlide(currentSlideIdx + 1));
+
+      thumbs.forEach((t) => {
+        t.addEventListener('click', () => setSlide(parseInt(t.dataset.idx, 10)));
+      });
+    }
+
+    // Hook Share Link Button
+    document.getElementById('modal-share-btn').addEventListener('click', () => {
+      sound.playBeep(1100);
+      navigator.clipboard.writeText(shareUrl).then(() => {
+        this.showToast('DIRECT APP LINK COPIED TO CLIPBOARD!');
+      }).catch(() => {
+        prompt('Salin link aplikasi ini:', shareUrl);
+      });
+    });
+
+    // Hook Download Button
     document.getElementById('modal-download-btn').addEventListener('click', () => {
       this.handleDownload(app);
     });
 
+    // Hook 3D Projection Button
     document.getElementById('modal-preview-3d-btn').addEventListener('click', () => {
       sound.playClick();
       if (this.retroScene) {

@@ -1,12 +1,20 @@
 /**
- * RetroVault - Local Database & Application Storage Management
+ * RetroVault - Local & Cloud Database Management
  * Handles persistent storage of published applications, preset retro data,
- * download stats, and JSON backup export/import.
+ * download stats, JSON backup export/import, and automatic Firebase Cloud Firestore sync.
  */
+
+import { 
+  isFirebaseConfigured, 
+  fetchRemoteApps, 
+  pushRemoteApp, 
+  deleteRemoteApp, 
+  incrementRemoteDownload 
+} from './firebase-config.js';
 
 const STORAGE_KEY = 'retrovault_apps_v1';
 
-// Initial aesthetic preset apps (Pinterest-style retro tech & pixel art visuals)
+// Initial aesthetic preset apps with Pinterest moodboard screenshots
 export const DEFAULT_APPS = [
   {
     id: 'cyberrunner-2084',
@@ -18,6 +26,11 @@ export const DEFAULT_APPS = [
     size: '64 MB',
     releaseDate: '2026-03-15',
     thumbnailUrl: 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?q=80&w=800&auto=format&fit=crop',
+    screenshots: [
+      'https://images.unsplash.com/photo-1550745165-9bc0b252726f?q=80&w=800&auto=format&fit=crop',
+      'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?q=80&w=800&auto=format&fit=crop',
+      'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?q=80&w=800&auto=format&fit=crop'
+    ],
     downloadUrl: '#download-cyberrunner',
     demoUrl: 'https://itch.io',
     downloadsCount: 1284,
@@ -43,6 +56,10 @@ export const DEFAULT_APPS = [
     size: '32 MB',
     releaseDate: '2026-02-28',
     thumbnailUrl: 'https://images.unsplash.com/photo-1579783902614-a3fb3927b675?q=80&w=800&auto=format&fit=crop',
+    screenshots: [
+      'https://images.unsplash.com/photo-1579783902614-a3fb3927b675?q=80&w=800&auto=format&fit=crop',
+      'https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=800&auto=format&fit=crop'
+    ],
     downloadUrl: '#download-pixelstudio',
     demoUrl: 'https://github.com',
     downloadsCount: 3420,
@@ -68,6 +85,10 @@ export const DEFAULT_APPS = [
     size: '48 MB',
     releaseDate: '2026-04-10',
     thumbnailUrl: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?q=80&w=800&auto=format&fit=crop',
+    screenshots: [
+      'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?q=80&w=800&auto=format&fit=crop',
+      'https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?q=80&w=800&auto=format&fit=crop'
+    ],
     downloadUrl: '#download-vaporsynth',
     demoUrl: 'https://github.com',
     downloadsCount: 890,
@@ -93,6 +114,10 @@ export const DEFAULT_APPS = [
     size: '18 MB',
     releaseDate: '2026-05-02',
     thumbnailUrl: 'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?q=80&w=800&auto=format&fit=crop',
+    screenshots: [
+      'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?q=80&w=800&auto=format&fit=crop',
+      'https://images.unsplash.com/photo-1555066931-4365d14bab8c?q=80&w=800&auto=format&fit=crop'
+    ],
     downloadUrl: '#download-retrodeck',
     demoUrl: 'https://github.com',
     downloadsCount: 2150,
@@ -118,6 +143,10 @@ export const DEFAULT_APPS = [
     size: '12 MB',
     releaseDate: '2026-01-20',
     thumbnailUrl: 'https://images.unsplash.com/photo-1550751827-4bd374c3f58b?q=80&w=800&auto=format&fit=crop',
+    screenshots: [
+      'https://images.unsplash.com/photo-1550751827-4bd374c3f58b?q=80&w=800&auto=format&fit=crop',
+      'https://images.unsplash.com/photo-1531525645387-7f14be1bdbbd?q=80&w=800&auto=format&fit=crop'
+    ],
     downloadUrl: '#download-patchcraft',
     demoUrl: '',
     downloadsCount: 4120,
@@ -140,9 +169,28 @@ class StorageManager {
     this.init();
   }
 
-  init() {
+  async init() {
     if (!localStorage.getItem(STORAGE_KEY)) {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(DEFAULT_APPS));
+    }
+
+    // Attempt background sync if Firebase is active
+    if (isFirebaseConfigured()) {
+      this.syncWithCloud();
+    }
+  }
+
+  async syncWithCloud() {
+    const remoteApps = await fetchRemoteApps();
+    if (remoteApps && remoteApps.length > 0) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(remoteApps));
+      console.log(`[RetroVault] Synchronized ${remoteApps.length} apps from Firebase Cloud!`);
+    } else if (remoteApps && remoteApps.length === 0) {
+      // First time cloud setup: seed default apps to Firestore
+      for (const app of DEFAULT_APPS) {
+        await pushRemoteApp(app);
+      }
+      console.log('[RetroVault] Initialized Cloud Firestore with default apps collection.');
     }
   }
 
@@ -165,21 +213,30 @@ class StorageManager {
     const apps = this.getAllApps();
     const existingIndex = apps.findIndex(a => a.id === appData.id);
 
+    let savedApp = null;
     if (existingIndex >= 0) {
-      apps[existingIndex] = { ...apps[existingIndex], ...appData, updatedAt: new Date().toISOString() };
+      savedApp = { ...apps[existingIndex], ...appData, updatedAt: new Date().toISOString() };
+      apps[existingIndex] = savedApp;
     } else {
-      const newApp = {
+      savedApp = {
         id: appData.id || 'app-' + Date.now(),
         releaseDate: new Date().toISOString().split('T')[0],
         downloadsCount: 0,
         rating: 5.0,
         sticker: appData.sticker || 'NEW',
+        screenshots: appData.screenshots || [appData.thumbnailUrl],
         ...appData
       };
-      apps.unshift(newApp);
+      apps.unshift(savedApp);
     }
 
     localStorage.setItem(STORAGE_KEY, JSON.stringify(apps));
+
+    // Cloud push
+    if (isFirebaseConfigured() && savedApp) {
+      pushRemoteApp(savedApp);
+    }
+
     return apps;
   }
 
@@ -187,6 +244,12 @@ class StorageManager {
     let apps = this.getAllApps();
     apps = apps.filter(a => a.id !== id);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(apps));
+
+    // Cloud delete
+    if (isFirebaseConfigured()) {
+      deleteRemoteApp(id);
+    }
+
     return apps;
   }
 
@@ -196,6 +259,12 @@ class StorageManager {
     if (app) {
       app.downloadsCount = (app.downloadsCount || 0) + 1;
       localStorage.setItem(STORAGE_KEY, JSON.stringify(apps));
+
+      // Cloud atomic increment
+      if (isFirebaseConfigured()) {
+        incrementRemoteDownload(id);
+      }
+
       return app.downloadsCount;
     }
     return 0;
@@ -218,6 +287,9 @@ class StorageManager {
       const parsed = JSON.parse(jsonString);
       if (Array.isArray(parsed)) {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
+        if (isFirebaseConfigured()) {
+          parsed.forEach(app => pushRemoteApp(app));
+        }
         return true;
       }
       return false;

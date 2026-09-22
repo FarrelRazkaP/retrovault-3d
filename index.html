@@ -52,7 +52,11 @@
           </button>
           <input type="file" id="import-file-input" accept=".json" style="display: none;" />
 
-          <button id="btn-open-upload" class="btn-retro btn-retro-pink">
+          <button id="btn-admin-auth" class="control-pill-btn" title="Toggle Admin Mode">
+            🔑 ADMIN LOGIN
+          </button>
+
+          <button id="btn-open-upload" class="btn-retro btn-retro-pink" style="display: none;">
             + PUBLISH APP
           </button>
         </nav>
@@ -387,6 +391,57 @@
       <div id="detail-content" class="modal-body">
         <!-- Injected via ui-manager.js -->
       </div>
+    </div>
+  </div>
+
+  <!-- ==========================================================================
+       MODAL 3: ADMIN AUTHENTICATION / ACCESS OVERRIDE
+       ========================================================================== -->
+  <div id="admin-login-modal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="admin-modal-title">
+    <div class="retro-modal-window" style="max-width: 480px;">
+      <div class="modal-titlebar">
+        <div class="modal-title-text" id="admin-modal-title">
+          <span>🔒</span> ADMIN_AUTHORIZATION.EXE
+        </div>
+        <div class="window-controls">
+          <button class="win-btn" data-close-modal title="Close Window">✖</button>
+        </div>
+      </div>
+
+      <form id="admin-login-form" class="modal-body">
+        <div class="hacker-terminal-box">
+          <div style="color: var(--neon-cyan); margin-bottom: 6px;">[SECURE TERMINAL // CLEARANCE REQUIRED]</div>
+          <div>Masuk sebagai Admin/Pemilik untuk mendapatkan izin upload, edit, dan hapus aplikasi.</div>
+          <div style="margin-top: 6px; font-size: 0.95rem; color: var(--neon-pink);">STATUS: ACCESS_RESTRICTED</div>
+        </div>
+
+        <div class="form-group" style="margin-top: 10px;">
+          <label for="admin-pin-input" class="form-label" style="text-align: center;">Masukkan Master PIN Admin</label>
+          <input 
+            type="password" 
+            id="admin-pin-input" 
+            class="terminal-pin-input" 
+            placeholder="••••••••" 
+            autocomplete="current-password" 
+            required 
+            autofocus 
+          />
+          <div id="admin-error-msg" style="color: var(--neon-pink); font-family: var(--font-tech); font-size: 0.75rem; text-align: center; margin-top: 6px; min-height: 18px;"></div>
+        </div>
+
+        <div style="background: rgba(255,255,255,0.03); border: 1px dashed var(--border-color); padding: 10px; font-size: 0.75rem; color: var(--text-muted); font-family: var(--font-tech); text-align: center;">
+          Default PIN: <code style="color: var(--neon-green);">farrel2026</code> (Bisa diubah di file .env / Vercel Settings)
+        </div>
+
+        <div class="modal-footer" style="justify-content: space-between;">
+          <button type="button" class="btn-retro btn-retro-secondary" data-close-modal>
+            BATAL
+          </button>
+          <button type="submit" class="btn-retro btn-retro-pink">
+            🔓 UNLOCK ACCESS
+          </button>
+        </div>
+      </form>
     </div>
   </div>
 
